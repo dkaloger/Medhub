@@ -1,0 +1,11 @@
+# Physiological recordings never go into version control.
+recordings/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+_deps/
+*.egg-info/
+.pytest_cache/
+.DS_Store
