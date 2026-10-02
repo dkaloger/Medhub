@@ -18,4 +18,11 @@ buildscript {
     }
 }
 
+allprojects {
+    repositories {
+        // usb-serial-for-android is published on JitPack.
+        maven { url "https://jitpack.io" }
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"
