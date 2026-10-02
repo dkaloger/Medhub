@@ -61,7 +61,7 @@ describe('Acquisition', () => {
   it('measures the actual sample rate', () => {
     const acq = new Acquisition(fs);
     for (let i = 0; i <= 40; i++) acq.ingest(batch(10, i * 40));
-    expect(acq.measuredRate(1600)).toBeCloseTo(250, 5);
+    expect(acq.measuredRate()).toBeCloseTo(250, 5);
   });
 
   it('notifies listeners with the absolute index of every sample', () => {

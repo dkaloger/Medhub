@@ -117,9 +117,11 @@ export class Acquisition {
     for (const l of this.listeners) l.event?.(this.end, text);
   }
 
-  /** Samples per second over the last few seconds of arrivals, or null if too little data. */
-  measuredRate(now: number): number | null {
-    this.trimArrivals(now);
+  /**
+   * Samples per second over the last few seconds of arrivals, or null if too little data.
+   * Uses only the source's own timestamps, whose clock may differ from the caller's.
+   */
+  measuredRate(): number | null {
     if (this.arrivals.length < 2) return null;
     const span = this.arrivals[this.arrivals.length - 1].at - this.arrivals[0].at;
     if (span < 1000) return null;

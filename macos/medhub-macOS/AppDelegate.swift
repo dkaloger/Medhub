@@ -8,10 +8,10 @@ struct medhubApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
   var body: some Scene {
-    Window("medhub", id: "main") {
+    Window("Medhub", id: "main") {
       ReactNativeView(factory: appDelegate.reactNativeFactory)
     }
-    .defaultSize(width: 1280, height: 720)
+    .defaultSize(width: 1360, height: 900)
   }
 }
 
@@ -22,14 +22,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
   let reactNativeFactory: RCTReactNativeFactory
 
   override init() {
-    super.init()
-
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+    super.init()
+  }
+
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    true
   }
 }
 
@@ -55,7 +58,7 @@ struct ReactNativeView: NSViewRepresentable {
   let factory: RCTReactNativeFactory
 
   func makeNSView(context: Context) -> NSView {
-    factory.rootViewFactory.view(withModuleName: "medhub")
+    factory.rootViewFactory.view(withModuleName: "Medhub")
   }
 
   func updateNSView(_ nsView: NSView, context: Context) {}

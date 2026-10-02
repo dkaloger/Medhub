@@ -23,23 +23,27 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSAppTransportSecurity</key>
- 	<dict>
- 		<key>NSAllowsArbitraryLoads</key>
- 		<true/>
- 		<key>NSExceptionDomains</key>
- 		<dict>
- 			<key>localhost</key>
- 			<dict>
- 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
- 				<true/>
- 			</dict>
- 		</dict>
- 	</dict>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Medhub connects to your ECG board over Bluetooth LE when you choose a Bluetooth device.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
+	<true/>
+	<key>RCTNewArchEnabled</key>
 	<true/>
 </dict>
 </plist>

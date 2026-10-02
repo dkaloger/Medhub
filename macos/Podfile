@@ -12,6 +12,9 @@ target 'medhub-macOS' do
   platform :macos, '14.0'
   use_native_modules!
 
+  # The app's own native module (USB serial, Bluetooth LE, recordings folder).
+  pod 'MedhubNative', :path => './MedhubNative'
+
   # Flags change depending on the env values.
   flags = get_default_flags()
 
