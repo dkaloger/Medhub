@@ -1,0 +1,43 @@
+{
+  "name": "medhub",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "macos": "react-native run-macos",
+    "windows": "react-native run-windows",
+    "start": "react-native start",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-native": "0.83.10",
+    "react-native-macos": "^0.83.0",
+    "react-native-svg": "^15.15.5",
+    "react-native-windows": "^0.83.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.0.0",
+    "@react-native-community/cli-platform-android": "20.0.0",
+    "@react-native-community/cli-platform-ios": "20.0.0",
+    "@react-native/babel-preset": "0.83.10",
+    "@react-native/eslint-config": "0.83.10",
+    "@react-native/metro-config": "0.83.10",
+    "@react-native/typescript-config": "0.83.10",
+    "@types/node": "^24.19.1",
+    "@types/react": "^19.2.0",
+    "eslint": "^8.19.0",
+    "prettier": "2.8.8",
+    "typescript": "^5.8.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "Bench viewer for the ADS1292R ECG / respiration board (React Native: Android, macOS, Windows)"
+}
