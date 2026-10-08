@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
-    "macos": "react-native run-macos",
+    "macos": "react-native start & react-native run-macos --scheme medhub-macOS --no-packager; wait",
     "windows": "react-native run-windows",
     "start": "react-native start",
     "lint": "eslint .",
