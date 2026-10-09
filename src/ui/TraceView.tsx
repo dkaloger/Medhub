@@ -74,7 +74,7 @@ interface AxesProps {
  * Background, grid and labels. Memoised on plain numbers so a live trace only redraws its
  * line each frame; the axes change only when the scale or size does.
  */
-const Axes = React.memo(function Axes({ width, height, yMin, yMax, xStart, windowSeconds, units, paperSpeed, paperGain }: AxesProps) {
+const Axes = React.memo(function AxesLayer({ width, height, yMin, yMax, xStart, windowSeconds, units, paperSpeed, paperGain }: AxesProps) {
   const frame: Frame = {
     x: MARGIN.left,
     y: MARGIN.top,
