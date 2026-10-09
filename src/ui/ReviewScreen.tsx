@@ -2,10 +2,11 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SAMPLE_RATE_HZ } from '../core/device';
 import { ecgDisplayChain, respDisplayChain } from '../core/filters';
-import { breathingRate, heartRate, signalStatus } from '../core/metrics';
+import { breathingRate, electrodeContact, heartRate, signalStatus } from '../core/metrics';
 import type { Recording } from '../core/recordingFile';
 import { ArraySeries } from '../core/series';
 import { Button, Pill } from './controls';
+import { contactMessage } from './contact';
 import { MetricTiles } from './panels';
 import { SignalPanels, type DisplaySettings } from './SignalPanels';
 import { colors, mono, space } from './theme';
@@ -46,7 +47,7 @@ export function ReviewScreen({
     return {
       heart: heartRate(ecgUpTo),
       breathing: recording.hasResp ? breathingRate(respUpTo) : { value: null, reason: 'no respiration data' },
-      ecgStatus: signalStatus(ecgUpTo),
+      contact: electrodeContact(ecgUpTo, respUpTo),
       respStatus: signalStatus(respUpTo),
     };
   }, [recording, metricsAt]);
@@ -85,6 +86,10 @@ export function ReviewScreen({
         live={false}
         endIndex={end}
         onPan={(dt) => setEnd((e) => clamp(e + dt * fs))}
+        ecgAlert={(() => {
+          const contact = contactMessage(metrics.contact, metrics.heart);
+          return contact.alert ? { text: contact.title, color: contact.color } : null;
+        })()}
         respEmptyText={recording.hasResp ? 'No respiration samples here' : 'This recording has no respiration channel'}
       />
       <Text style={styles.hint}>Drag a trace to scroll through the recording.</Text>

@@ -12,7 +12,15 @@ import {
   type NotchId,
   type RespFilterId,
 } from '../core/filters';
-import { breathingRate, heartRate, signalStatus, type RateEstimate, type SignalStatus } from '../core/metrics';
+import {
+  breathingRate,
+  electrodeContact,
+  heartRate,
+  signalStatus,
+  type ContactStatus,
+  type RateEstimate,
+  type SignalStatus,
+} from '../core/metrics';
 import { ClipRecorder, SessionLogger, type RecordingStore } from '../core/recorder';
 import type { SampleSource, SourceEvent } from './sources';
 
@@ -31,7 +39,7 @@ export interface SessionSnapshot {
   gaps: number;
   heart: RateEstimate;
   breathing: RateEstimate;
-  ecgStatus: SignalStatus;
+  contact: ContactStatus;
   respStatus: SignalStatus;
   respPresent: boolean;
   lastMessage: { text: string; isError: boolean; at: number } | null;
@@ -54,7 +62,7 @@ const INITIAL: SessionSnapshot = {
   gaps: 0,
   heart: NO_RATE,
   breathing: NO_RATE,
-  ecgStatus: 'no-data',
+  contact: 'no-data',
   respStatus: 'no-data',
   respPresent: false,
   lastMessage: null,
@@ -205,7 +213,7 @@ export class LiveSession {
       gaps: acq.gaps.length,
       heart: heartRate(ecg),
       breathing: respPresent ? breathingRate(resp) : { value: null, reason: 'no respiration data' },
-      ecgStatus: signalStatus(ecg),
+      contact: electrodeContact(ecg, resp),
       respStatus: signalStatus(resp),
       respPresent,
       logging: this.logger ? { location: this.logger.location, seconds: this.logger.samplesWritten / SAMPLE_RATE_HZ } : null,

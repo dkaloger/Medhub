@@ -4,6 +4,7 @@ import { SAMPLE_RATE_HZ } from '../core/device';
 import { RingBuffer } from '../core/series';
 import type { LiveSession, SessionSnapshot } from '../session/liveSession';
 import { Button, Pill } from './controls';
+import { contactMessage } from './contact';
 import { MetricTiles } from './panels';
 import { SignalPanels, type DisplaySettings } from './SignalPanels';
 import { colors, mono, space } from './theme';
@@ -47,6 +48,7 @@ export function LiveScreen({
   useEffect(() => setPausedAt(null), [acq]);
 
   const pill = connectionPill(snapshot);
+  const contact = contactMessage(snapshot.contact, snapshot.heart);
   const togglePause = () => setPausedAt((p) => (p === null && acq ? acq.end : null));
   const pan = (dt: number) =>
     setPausedAt((p) => {
@@ -88,7 +90,7 @@ export function LiveScreen({
       <MetricTiles
         heart={snapshot.heart}
         breathing={snapshot.breathing}
-        ecgStatus={snapshot.ecgStatus}
+        contact={snapshot.contact}
         respStatus={snapshot.respStatus}
         respPresent={snapshot.respPresent}
         context="live"
@@ -103,6 +105,7 @@ export function LiveScreen({
         endIndex={pausedAt ?? 0}
         onPan={pausedAt !== null ? pan : undefined}
         respEmptyText={snapshot.respPresent || !acq ? 'Waiting for respiration samples' : 'No respiration channel in this firmware'}
+        ecgAlert={contact.alert ? { text: contact.title, color: contact.color } : null}
       />
 
       <View style={styles.footer}>

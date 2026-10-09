@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { ClipPath, Defs, Path, Rect, Text as SvgText } from 'react-native-svg';
+import { isClipped } from '../core/device';
 import type { SampleSeries } from '../core/series';
 import { colors, mono } from './theme';
 import {
@@ -38,12 +39,14 @@ interface Props {
   /** Virtual ECG paper: fixed mm/s and mm/mV scaling on a 1 mm / 5 mm grid. */
   paper?: PaperSettings | null;
   emptyText?: string;
+  /** Redraw interval while live; slow signals don't need a high frame rate. */
+  frameMs?: number;
   /** Called while dragging a paused or recorded trace. */
   onPan?: (deltaSeconds: number) => void;
 }
 
 const MARGIN = { left: 70, right: 10, top: 8, bottom: 22 };
-const FRAME_MS = 33;
+const FRAME_MS = 50;
 const RESCALE_MS = 500;
 
 const positiveMod = (a: number, m: number) => ((a % m) + m) % m;
@@ -54,17 +57,97 @@ function paperScale(width: number, windowSeconds: number, paper: PaperSettings) 
   return { pxPerMm, mvPerPx: 1 / (paper.gain * pxPerMm) };
 }
 
+interface AxesProps {
+  width: number;
+  height: number;
+  yMin: number;
+  yMax: number;
+  /** Time at the left edge, in seconds; live views use negative "seconds before now". */
+  xStart: number;
+  windowSeconds: number;
+  units: Units;
+  paperSpeed: number;
+  paperGain: number;
+}
+
+/**
+ * Background, grid and labels. Memoised on plain numbers so a live trace only redraws its
+ * line each frame; the axes change only when the scale or size does.
+ */
+const Axes = React.memo(function Axes({ width, height, yMin, yMax, xStart, windowSeconds, units, paperSpeed, paperGain }: AxesProps) {
+  const frame: Frame = {
+    x: MARGIN.left,
+    y: MARGIN.top,
+    width: width - MARGIN.left - MARGIN.right,
+    height: height - MARGIN.top - MARGIN.bottom,
+    yMin,
+    yMax,
+  };
+  const paper = paperSpeed > 0;
+  const xOf = (s: number) => frame.x + ((s - xStart) / windowSeconds) * frame.width;
+  const yOf = (v: number) => frame.y + frame.height * (1 - (v - yMin) / (yMax - yMin));
+
+  let gridMinor = '';
+  let gridMajor: string;
+  let xTicks: number[];
+  let yTicks: number[];
+  if (paper) {
+    // Grid lines sit on whole millimetres of the virtual paper: t·speed and v·gain.
+    const pxPerMm = frame.width / (windowSeconds * paperSpeed);
+    const offset = (mm: number, step: number) => positiveMod(mm, step) * pxPerMm;
+    const leftMm = xStart * paperSpeed;
+    const topMm = yMax * paperGain;
+    gridMinor = gridPath(frame, pxPerMm, pxPerMm, offset(-leftMm, 1), offset(topMm, 1));
+    gridMajor = gridPath(frame, 5 * pxPerMm, 5 * pxPerMm, offset(-leftMm, 5), offset(topMm, 5));
+    xTicks = niceTicks(xStart, xStart + windowSeconds, Math.max(2, Math.round(windowSeconds)));
+    yTicks = niceTicks(yMin, yMax, 4);
+  } else {
+    xTicks = niceTicks(xStart, xStart + windowSeconds, Math.max(2, Math.floor(frame.width / 110)));
+    yTicks = niceTicks(yMin, yMax, Math.max(2, Math.floor(frame.height / 45)));
+    gridMajor =
+      xTicks.map((t) => `M${xOf(t).toFixed(1)} ${frame.y}V${frame.y + frame.height}`).join('') +
+      yTicks.map((v) => `M${frame.x} ${yOf(v).toFixed(1)}H${frame.x + frame.width}`).join('');
+  }
+  const label = paper ? colors.paperText : colors.faint;
+  const yStep = yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1;
+
+  return (
+    <>
+      <Rect x={frame.x} y={frame.y} width={frame.width} height={frame.height} fill={paper ? colors.paperBg : colors.panel} />
+      {gridMinor ? <Path d={gridMinor} stroke={colors.paperMinor} strokeWidth={0.5} /> : null}
+      {gridMajor ? <Path d={gridMajor} stroke={paper ? colors.paperMajor : colors.gridMajor} strokeWidth={paper ? 0.9 : 1} /> : null}
+      {xTicks.map((t) => (
+        <SvgText key={`x${t}`} x={xOf(t)} y={height - 6} fill={label} fontSize={10} fontFamily={mono} textAnchor="middle">
+          {formatTime(t, windowSeconds)}
+        </SvgText>
+      ))}
+      {yTicks.map((v) => (
+        <SvgText key={`y${v}`} x={frame.x - 6} y={yOf(v) + 3} fill={label} fontSize={10} fontFamily={mono} textAnchor="end">
+          {formatValue(v, units, yStep)}
+        </SvgText>
+      ))}
+    </>
+  );
+});
+
 export function TraceView(props: Props) {
-  const { series, fs, live, endIndex, windowSeconds, height, color, units, paper, emptyText, onPan } = props;
+  const { series, fs, live, endIndex, windowSeconds, height, color, units, paper, emptyText, onPan, frameMs = FRAME_MS } = props;
   const [width, setWidth] = useState(0);
+  const clipId = `plot${useId().replace(/[^A-Za-z0-9]/g, '')}`;
   const [, setFrame] = useState(0);
   const range = useRef<{ at: number; key: string; yMin: number; yMax: number } | null>(null);
 
+  // Redraw only when new samples have arrived.
   useEffect(() => {
     if (!live) return;
-    const timer = setInterval(() => setFrame((n) => n + 1), FRAME_MS);
+    let drawnEnd = -1;
+    const timer = setInterval(() => {
+      if (series.end === drawnEnd) return;
+      drawnEnd = series.end;
+      setFrame((n) => n + 1);
+    }, frameMs);
     return () => clearInterval(timer);
-  }, [live]);
+  }, [live, series, frameMs]);
 
   const panHandlers = useMemo(() => {
     let lastDx = 0;
@@ -103,7 +186,8 @@ export function TraceView(props: Props) {
       const mid = centre(cols) ?? 0;
       range.current = { at: now, key: scaleKey, yMin: mid - (plotH / 2) * mvPerPx, yMax: mid + (plotH / 2) * mvPerPx };
     } else {
-      const r = autoRange(cols);
+      // Saturated samples carry no signal; scaling to them would flatten everything else.
+      const r = autoRange(cols, units === 'counts' ? isClipped : undefined);
       if (r) range.current = { at: now, key: scaleKey, yMin: r[0], yMax: r[1] };
     }
   }
@@ -120,64 +204,39 @@ export function TraceView(props: Props) {
         : samplesPath(series, start, count, frame, units)
       : '';
 
-  const secondsStart = start / fs;
-  const secondsEnd = end / fs;
-  const xOf = (s: number) => MARGIN.left + ((s - secondsStart) / windowSeconds) * plotW;
-  const yOf = (v: number) => (frame ? frame.y + frame.height * (1 - (v - frame.yMin) / (frame.yMax - frame.yMin)) : 0);
-
-  let gridMinor = '';
-  let gridMajor = '';
-  let xTicks: number[] = [];
-  let yTicks: number[] = [];
-  if (frame && paper) {
-    // Grid lines sit on whole millimetres of the virtual paper: t·speed and v·gain.
-    const { pxPerMm } = paperScale(plotW, windowSeconds, paper);
-    const leftMm = secondsStart * paper.speed;
-    const topMm = frame.yMax * paper.gain;
-    const offset = (mm: number, step: number) => positiveMod(mm, step) * pxPerMm;
-    gridMinor = gridPath(frame, pxPerMm, pxPerMm, offset(-leftMm, 1), offset(topMm, 1));
-    gridMajor = gridPath(frame, 5 * pxPerMm, 5 * pxPerMm, offset(-leftMm, 5), offset(topMm, 5));
-    xTicks = niceTicks(secondsStart, secondsEnd, Math.max(2, Math.round(windowSeconds)));
-    yTicks = niceTicks(frame.yMin, frame.yMax, 4);
-  } else if (frame) {
-    xTicks = niceTicks(secondsStart, secondsEnd, Math.max(2, Math.floor(plotW / 110)));
-    yTicks = niceTicks(frame.yMin, frame.yMax, Math.max(2, Math.floor(plotH / 45)));
-    gridMajor =
-      xTicks.map((t) => `M${xOf(t).toFixed(1)} ${frame.y}V${frame.y + frame.height}`).join('') +
-      yTicks.map((v) => `M${frame.x} ${yOf(v).toFixed(1)}H${frame.x + frame.width}`).join('');
-  }
-
-  const bg = paper ? colors.paperBg : colors.panel;
-  const label = paper ? colors.paperText : colors.faint;
-
   return (
     <View style={{ height }} onLayout={onLayout} {...panHandlers}>
       {width > 0 ? (
         <Svg width={width} height={height}>
-          <Rect x={MARGIN.left} y={MARGIN.top} width={plotW} height={plotH} fill={bg} />
-          {gridMinor ? <Path d={gridMinor} stroke={colors.paperMinor} strokeWidth={0.5} /> : null}
-          {gridMajor ? (
-            <Path d={gridMajor} stroke={paper ? colors.paperMajor : colors.gridMajor} strokeWidth={paper ? 0.9 : 1} />
-          ) : null}
+          <Defs>
+            <ClipPath id={clipId}>
+              <Rect x={MARGIN.left} y={MARGIN.top} width={plotW} height={plotH} />
+            </ClipPath>
+          </Defs>
+          {frame ? (
+            <Axes
+              width={width}
+              height={height}
+              yMin={frame.yMin}
+              yMax={frame.yMax}
+              xStart={live ? -windowSeconds : start / fs}
+              windowSeconds={windowSeconds}
+              units={units}
+              paperSpeed={paper?.speed ?? 0}
+              paperGain={paper?.gain ?? 0}
+            />
+          ) : (
+            <Rect x={MARGIN.left} y={MARGIN.top} width={plotW} height={plotH} fill={paper ? colors.paperBg : colors.panel} />
+          )}
           {trace ? (
             <Path
+              clipPath={`url(#${clipId})`}
               d={trace}
               stroke={paper ? colors.paperTrace : color}
               strokeWidth={paper ? 1.2 : 1.4}
               fill="none"
-              strokeLinejoin="round"
             />
           ) : null}
-          {xTicks.map((t) => (
-            <SvgText key={`x${t}`} x={xOf(t)} y={height - 6} fill={label} fontSize={10} fontFamily={mono} textAnchor="middle">
-              {formatTime(t, windowSeconds)}
-            </SvgText>
-          ))}
-          {yTicks.map((v) => (
-            <SvgText key={`y${v}`} x={MARGIN.left - 6} y={yOf(v) + 3} fill={label} fontSize={10} fontFamily={mono} textAnchor="end">
-              {formatValue(v, units, yTicks.length > 1 ? yTicks[1] - yTicks[0] : 1)}
-            </SvgText>
-          ))}
         </Svg>
       ) : null}
       {width > 0 && !hasData ? (

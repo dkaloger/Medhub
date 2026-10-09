@@ -1,15 +1,29 @@
 import React, { type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { RateEstimate, SignalStatus } from '../core/metrics';
+import type { ContactStatus, RateEstimate, SignalStatus } from '../core/metrics';
+import { contactMessage } from './contact';
 import { colors, mono, space } from './theme';
 
-export function Panel({ title, accent, right, children }: { title: string; accent: string; right?: ReactNode; children: ReactNode }) {
+export function Panel({
+  title,
+  accent,
+  badge,
+  right,
+  children,
+}: {
+  title: string;
+  accent: string;
+  badge?: ReactNode;
+  right?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <View style={styles.panel}>
       <View style={styles.panelHeader}>
         <View style={styles.titleRow}>
           <View style={[styles.accent, { backgroundColor: accent }]} />
           <Text style={styles.title}>{title}</Text>
+          {badge}
         </View>
         <View style={styles.controls}>{right}</View>
       </View>
@@ -23,7 +37,7 @@ const STATUS_TEXT: Record<SignalStatus, { text: string; color: string }> = {
   collecting: { text: 'Collecting…', color: colors.muted },
   clipped: { text: 'ADC clipped', color: colors.danger },
   flat: { text: 'Flat — check leads', color: colors.warn },
-  ok: { text: 'No clipping · contact unverified', color: colors.ok },
+  ok: { text: 'In range', color: colors.ok },
 };
 
 function Tile({
@@ -60,24 +74,27 @@ function Tile({
 export function MetricTiles({
   heart,
   breathing,
-  ecgStatus,
+  contact,
   respStatus,
   respPresent,
   context,
 }: {
   heart: RateEstimate;
   breathing: RateEstimate;
-  ecgStatus: SignalStatus;
+  contact: ContactStatus;
   respStatus: SignalStatus;
   respPresent: boolean;
   context: 'live' | 'review';
 }) {
   const span = (s: number) => (context === 'live' ? `last ${s} s` : `${s} s before view end`);
-  const ecg = STATUS_TEXT[ecgStatus];
-  const resp =
-    respPresent || respStatus === 'no-data' && ecgStatus === 'no-data'
-      ? STATUS_TEXT[respPresent ? respStatus : 'no-data']
-      : { text: 'Not sent by firmware', color: colors.faint };
+  const electrodes = contactMessage(contact, heart);
+  const resp = !respPresent
+    ? contact === 'no-data'
+      ? STATUS_TEXT['no-data']
+      : { text: 'Not sent by firmware', color: colors.faint }
+    : respStatus === 'clipped' && contact === 'off'
+      ? { text: 'Saturated', color: colors.danger }
+      : STATUS_TEXT[respStatus];
   return (
     <View style={styles.tiles}>
       <Tile
@@ -94,7 +111,7 @@ export function MetricTiles({
         note={breathing.value !== null ? `Experimental · ${span(60)}` : breathing.reason}
         color={breathing.value !== null ? colors.resp : colors.faint}
       />
-      <Tile label="ECG signal" value={ecg.text} note="ADC check only; no lead-off detection" color={ecg.color} small />
+      <Tile label="Electrodes" value={electrodes.title} note={electrodes.note} color={electrodes.color} small />
       <Tile label="Respiration signal" value={resp.text} note="ADS1292R CH1, uncalibrated" color={resp.color} small />
     </View>
   );

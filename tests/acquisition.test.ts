@@ -24,6 +24,16 @@ describe('RingBuffer', () => {
     expect(Array.from(ring.read(0, 100).values)).toEqual([9, 10, 11, 12, 13]);
   });
 
+  it('finds the extent of a range across the wrap-around, skipping gaps', () => {
+    const ring = new RingBuffer(5);
+    ring.push([9, 1, 2, NaN, 7, 3, -4]); // holds indices 2..6: 2, NaN, 7, 3, -4
+    const out = new Float64Array(2);
+    expect(ring.extent(0, 100, out)).toBe(true);
+    expect(Array.from(out)).toEqual([-4, 7]);
+    expect(ring.extent(3, 4, out)).toBe(false);
+    expect(ring.extent(5, 6, out) && Array.from(out)).toEqual([3, 3]);
+  });
+
   it('records gaps as NaN without allocating them', () => {
     const ring = new RingBuffer(4);
     ring.push([1, 2]);

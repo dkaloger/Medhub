@@ -115,15 +115,17 @@ RCT_EXPORT_MODULE(MedhubNative)
   _hasListeners = false;
 }
 
+// React Native calls this on methodQueue (_queue) when the JS runtime reloads or shuts
+// down, so the cleanup runs inline: dispatch_sync onto _queue from here would trap.
 - (void)invalidate {
   _generation++;
-  dispatch_sync(_queue, ^{
-    [self closeSerial];
-    for (NSFileHandle *handle in self->_files.allValues) [handle closeAndReturnError:nil];
-    [self->_files removeAllObjects];
-  });
-  dispatch_sync(_bleQueue, ^{
-    if (self->_peripheral) [self->_central cancelPeripheralConnection:self->_peripheral];
+  [self closeSerial];
+  for (NSFileHandle *handle in _files.allValues) [handle closeAndReturnError:nil];
+  [_files removeAllObjects];
+  CBCentralManager *central = _central;
+  dispatch_async(_bleQueue, ^{
+    if (self->_peripheral) [central cancelPeripheralConnection:self->_peripheral];
+    self->_peripheral = nil;
   });
   [super invalidate];
 }

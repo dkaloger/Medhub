@@ -24,37 +24,30 @@ export function decimate(series: SampleSeries, startIndex: number, count: number
   const min = new Float64Array(columns).fill(NaN);
   const max = new Float64Array(columns).fill(NaN);
   const samplesPerColumn = count / columns;
+  const extent = new Float64Array(2);
   for (let c = 0; c < columns; c++) {
     const from = startIndex + Math.floor(c * samplesPerColumn);
     const to = Math.max(from + 1, startIndex + Math.floor((c + 1) * samplesPerColumn));
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let i = from; i < to; i++) {
-      const v = series.at(i);
-      if (Number.isFinite(v)) {
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-    }
-    if (lo <= hi) {
-      min[c] = toUnits(lo);
-      max[c] = toUnits(hi);
+    if (series.extent(from, to, extent)) {
+      min[c] = toUnits(extent[0]);
+      max[c] = toUnits(extent[1]);
     }
   }
   return { min, max, samplesPerColumn };
 }
 
-/** Robust range (1st–99th percentile of the column extremes) with 15% padding. */
-export function autoRange(cols: Columns): [number, number] | null {
+/**
+ * Robust range (1st–99th percentile of the column extremes) with 15% padding. Values for
+ * which `ignore` returns true, such as samples pinned at the ADC rails, don't set the scale.
+ */
+export function autoRange(cols: Columns, ignore: (value: number) => boolean = () => false): [number, number] | null {
   const lows: number[] = [];
   const highs: number[] = [];
   for (let c = 0; c < cols.min.length; c++) {
-    if (Number.isFinite(cols.min[c])) {
-      lows.push(cols.min[c]);
-      highs.push(cols.max[c]);
-    }
+    if (Number.isFinite(cols.min[c]) && !ignore(cols.min[c])) lows.push(cols.min[c]);
+    if (Number.isFinite(cols.max[c]) && !ignore(cols.max[c])) highs.push(cols.max[c]);
   }
-  if (lows.length === 0) return null;
+  if (lows.length === 0 || highs.length === 0) return null;
   const lo = percentile(lows, 1);
   const hi = percentile(highs, 99);
   const pad = Math.max((hi - lo) * 0.15, Math.abs(hi) * 1e-6, 1e-3);
@@ -147,6 +140,7 @@ export function formatDuration(seconds: number): string {
 }
 
 export function formatTime(seconds: number, spanSeconds: number): string {
+  if (seconds < 0) return `−${formatTime(-seconds, spanSeconds)}`;
   if (spanSeconds >= 60) {
     const s = Math.round(seconds);
     const m = Math.floor(s / 60);

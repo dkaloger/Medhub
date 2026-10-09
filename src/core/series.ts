@@ -5,6 +5,24 @@ export interface SampleSeries {
   /** One past the newest index. */
   readonly end: number;
   at(index: number): number;
+  /**
+   * Lowest and highest finite value in [from, to), written to out[0] and out[1]; false if
+   * there are none. Much cheaper than calling at() per sample when drawing.
+   */
+  extent(from: number, to: number, out: Float64Array): boolean;
+}
+
+function scan(data: Float64Array, from: number, to: number, out: Float64Array, found: boolean): boolean {
+  let lo = found ? out[0] : Infinity;
+  let hi = found ? out[1] : -Infinity;
+  for (let i = from; i < to; i++) {
+    const v = data[i];
+    if (v < lo) lo = v; // NaN compares false both ways, so gaps are skipped
+    if (v > hi) hi = v;
+  }
+  out[0] = lo;
+  out[1] = hi;
+  return lo <= hi;
 }
 
 /** Fixed-capacity buffer addressed by absolute sample index. Old samples fall off the front. */
@@ -27,6 +45,17 @@ export class RingBuffer implements SampleSeries {
   at(index: number): number {
     if (index < this.start || index >= this._end) return NaN;
     return this.data[index % this.capacity];
+  }
+
+  extent(from: number, to: number, out: Float64Array): boolean {
+    const a = Math.max(from, this.start);
+    const b = Math.min(to, this._end);
+    if (b <= a) return false;
+    const i = a % this.capacity;
+    const n = b - a;
+    if (i + n <= this.capacity) return scan(this.data, i, i + n, out, false);
+    const first = scan(this.data, i, this.capacity, out, false);
+    return scan(this.data, 0, n - (this.capacity - i), out, first);
   }
 
   push(values: ArrayLike<number>): void {
@@ -82,6 +111,12 @@ export class ArraySeries implements SampleSeries {
   at(index: number): number {
     const i = index - this.start;
     return i >= 0 && i < this.values.length ? this.values[i] : NaN;
+  }
+
+  extent(from: number, to: number, out: Float64Array): boolean {
+    const a = Math.max(from - this.start, 0);
+    const b = Math.min(to - this.start, this.values.length);
+    return b > a && scan(this.values, a, b, out, false);
   }
 }
 

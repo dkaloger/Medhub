@@ -3,7 +3,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SAMPLE_RATE_HZ } from '../core/device';
 import { ECG_FILTERS, MAINS_NOTCH, RESP_FILTERS, type EcgFilterId, type NotchId, type RespFilterId } from '../core/filters';
 import type { SampleSeries } from '../core/series';
-import { Segmented, Toggle, type Option } from './controls';
+import { Pill, Segmented, Toggle, type Option } from './controls';
 import { Panel } from './panels';
 import { colors, space } from './theme';
 import { TraceView } from './TraceView';
@@ -49,6 +49,7 @@ export function SignalPanels({
   endIndex,
   onPan,
   respEmptyText,
+  ecgAlert,
 }: {
   settings: DisplaySettings;
   onChange: (settings: DisplaySettings) => void;
@@ -58,6 +59,8 @@ export function SignalPanels({
   endIndex: number;
   onPan?: (deltaSeconds: number) => void;
   respEmptyText: string;
+  /** Shown beside the ECG title, e.g. when the electrodes are off. */
+  ecgAlert?: { text: string; color: string } | null;
 }) {
   const { height } = useWindowDimensions();
   const ecgHeight = Math.round(Math.min(440, Math.max(200, height * 0.36)));
@@ -69,6 +72,7 @@ export function SignalPanels({
       <Panel
         title="ECG"
         accent={colors.ecg}
+        badge={ecgAlert ? <Pill text={ecgAlert.text} color={ecgAlert.color} /> : null}
         right={
           <>
             <Segmented options={ECG_WINDOWS} value={settings.ecgWindow} onChange={(ecgWindow) => set({ ecgWindow })} />
@@ -116,6 +120,7 @@ export function SignalPanels({
           color={colors.resp}
           units="counts"
           emptyText={respEmptyText}
+          frameMs={100}
           onPan={onPan}
         />
       </Panel>

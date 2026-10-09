@@ -31,9 +31,8 @@ export default function App() {
     NativeStore.open()
       .then((store) => session.setStore(store))
       .catch((e) => setStorageError(`Recordings folder unavailable: ${e?.message ?? e}`));
-    return () => {
-      void session.disconnect();
-    };
+    // No disconnect on cleanup: Fast Refresh re-runs effects and would drop a live
+    // device mid-session. The native module closes the port when the app exits.
   }, [session]);
 
   // Display filters live in the session so every buffered sample is re-filtered on change.

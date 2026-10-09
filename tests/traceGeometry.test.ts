@@ -40,6 +40,13 @@ describe('scales and labels', () => {
     expect(lo).toBeLessThan(0);
   });
 
+  it('can leave saturated values out of the scale', () => {
+    const min = Float64Array.from([990, 1000, 8_388_607]);
+    const max = Float64Array.from([1010, 8_388_607, 8_388_607]);
+    const [, hi] = autoRange({ min, max, samplesPerColumn: 1 }, (v) => v > 8_000_000)!;
+    expect(hi).toBeLessThan(1100);
+  });
+
   it('picks round tick values', () => {
     expect(niceTicks(0, 10)).toEqual([0, 2, 4, 6, 8, 10]);
     expect(niceTicks(-0.73, 0.41, 4)).toEqual([-0.6, -0.4, -0.2, 0, 0.2, 0.4]);
@@ -54,5 +61,6 @@ describe('scales and labels', () => {
   it('formats session time', () => {
     expect(formatTime(125, 120)).toBe('2:05');
     expect(formatTime(12.34, 2)).toBe('12.3');
+    expect(formatTime(-90, 120)).toBe('−1:30');
   });
 });
