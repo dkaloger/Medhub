@@ -4,6 +4,7 @@
  * through subscribe()/getSnapshot() (useSyncExternalStore); plots read buffers directly.
  */
 import { Acquisition } from '../core/acquisition';
+import { ANALYSIS, analyseEcg, type EcgAnalysis } from '../core/ecgAnalysis';
 import { SAMPLE_RATE_HZ } from '../core/device';
 import {
   ecgDisplayChain,
@@ -27,6 +28,8 @@ import type { SampleSource, SourceEvent } from './sources';
 export const BUFFER_SECONDS = 600;
 export const CLIP_SECONDS = 120;
 const TICK_MS = 1000;
+/** Beat analysis is heavier than the other metrics, so it runs every few ticks. */
+const ANALYSIS_EVERY_TICKS = 3;
 const RESP_PRESENT_WINDOW_S = 5;
 
 export interface SessionSnapshot {
@@ -40,6 +43,8 @@ export interface SessionSnapshot {
   heart: RateEstimate;
   breathing: RateEstimate;
   contact: ContactStatus;
+  /** Rhythm, intervals and beat variation; refreshed every few seconds. */
+  analysis: EcgAnalysis | null;
   respStatus: SignalStatus;
   respPresent: boolean;
   lastMessage: { text: string; isError: boolean; at: number } | null;
@@ -63,6 +68,7 @@ const INITIAL: SessionSnapshot = {
   heart: NO_RATE,
   breathing: NO_RATE,
   contact: 'no-data',
+  analysis: null,
   respStatus: 'no-data',
   respPresent: false,
   lastMessage: null,
@@ -83,6 +89,7 @@ export class LiveSession {
   private snapshot: SessionSnapshot = INITIAL;
   private readonly listeners = new Set<() => void>();
   private lastTickSamples = 0;
+  private ticks = 0;
   private ecgFilter: { filter: EcgFilterId; notch: NotchId } = { filter: 'monitor', notch: 'off' };
   private respFilter: RespFilterId = 'lowpass2';
 
@@ -214,6 +221,9 @@ export class LiveSession {
       heart: heartRate(ecg),
       breathing: respPresent ? breathingRate(resp) : { value: null, reason: 'no respiration data' },
       contact: electrodeContact(ecg, resp),
+      ...(this.ticks++ % ANALYSIS_EVERY_TICKS === 0
+        ? { analysis: analyseEcg(acq.ecg.raw.read(end - ANALYSIS.windowS * SAMPLE_RATE_HZ, end).values) }
+        : {}),
       respStatus: signalStatus(resp),
       respPresent,
       logging: this.logger ? { location: this.logger.location, seconds: this.logger.samplesWritten / SAMPLE_RATE_HZ } : null,

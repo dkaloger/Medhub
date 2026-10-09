@@ -27,6 +27,18 @@ The original Python/Tk viewer is preserved on the `archive` branch.
   - **Honest failures:** each estimate reports why it has no value, e.g. "ADC clipped",
     "no clear beats", "too many missed breaths".
   - **No splicing:** an estimate never joins data across a dropout.
+- **Rhythm and intervals** (experimental, not diagnostic):
+  - **Median beat:** recent normal beats are averaged into one beat, and PR, QRS, QT and QTc
+    (Bazett and Fridericia) are measured on it. The wave boundaries are drawn on the beat so
+    you can check them, and values show "—" when a wave can't be measured reliably, for
+    example when T and P waves merge at fast rates.
+  - **Rhythm description:** rate (slow, normal or fast), regular or irregular, early beats,
+    pauses, and whether a P wave precedes the QRS. Chaotic beat timing is flagged as a
+    pattern that can occur with atrial fibrillation, using the RMSSD, Shannon-entropy and
+    turning-point tests of Dash et al., 2009. The tool cannot diagnose it.
+  - **Beat-to-beat variation (HRV):** SDNN, RMSSD, pNN50 and Poincaré SD1/SD2 from
+    normal-to-normal beats over the last 2 minutes, with an RR-interval chart marking early
+    and late beats.
 - **Continuous logging:** every sample is written to disk, in 10-minute part files plus an
   `events.csv` of connections, dropouts and device messages.
 - **Clips:** record up to 2-minute clips.
@@ -43,7 +55,8 @@ src/core/      Platform-independent signal code (unit-tested)
   protocol.ts      Line parsing and framing (partial lines are never parsed)
   filters.ts       Butterworth / notch biquads, streaming FilterChain, filtfilt
   peaks.ts         find_peaks equivalent
-  metrics.ts       Heart rate, breathing rate, ADC status
+  metrics.ts       Heart rate, breathing rate, electrode contact, ADC status
+  ecgAnalysis.ts   Beat detection, rhythm, HRV, median beat and interval measurement
   acquisition.ts   Ring buffers, display filtering, gap detection
   recorder.ts      Continuous logger and clip writer
   recordingFile.ts CSV format and reader

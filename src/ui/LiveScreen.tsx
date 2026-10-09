@@ -6,6 +6,7 @@ import type { LiveSession, SessionSnapshot } from '../session/liveSession';
 import { Button, Pill } from './controls';
 import { contactMessage } from './contact';
 import { MetricTiles } from './panels';
+import { RhythmPanel } from './RhythmPanel';
 import { SignalPanels, type DisplaySettings } from './SignalPanels';
 import { colors, mono, space } from './theme';
 
@@ -107,6 +108,8 @@ export function LiveScreen({
         respEmptyText={snapshot.respPresent || !acq ? 'Waiting for respiration samples' : 'No respiration channel in this firmware'}
         ecgAlert={contact.alert ? { text: contact.title, color: contact.color } : null}
       />
+
+      <RhythmPanel analysis={snapshot.analysis} context="live" />
 
       <View style={styles.footer}>
         {acq ? <Text style={styles.status}>{status}</Text> : null}
